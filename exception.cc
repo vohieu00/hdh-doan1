@@ -25,6 +25,8 @@
 #include "system.h"
 #include "syscall.h"
 #define MaxFileLength 32
+#define MAX_INT_LENGTH 9
+#define MASK_GET_NUM 0xF
 //----------------------------------------------------------------------
 // ExceptionHandler
 // 	Entry point into the Nachos kernel.  Called when a user program
@@ -55,7 +57,7 @@ void ProgramCounter()
 {
 	int step = 4; 
 	int count = machine->ReadRegister(PCReg); //PC Register is used
-	machine->WriteRegister(PrevPCReg, count) // Assign PC Regiter to PrePCReg
+	machine->WriteRegister(PrevPCReg, count); // Assign PC Regiter to PrePCReg
 	count = machine->ReadRegister(NextPCReg); 
 	machine->WriteRegister(PCReg, count);
 	machine->WriteRegister(NextPCReg, count + step);
@@ -117,7 +119,7 @@ void ExceptionHandler(ExceptionType which)
 	case SyscallException:
 		switch (type) {
 		case SC_Halt:
-			DEBUG('a', "\n Shutdown, initiated by user program.");
+			DEBUG('a', "\n Shutd own, initiated by user program.");
 			printf("\n\n Shutdown, initiated by user program.");
 			interrupt->Halt();
 			break;
@@ -158,10 +160,11 @@ void ExceptionHandler(ExceptionType which)
 			//Read "size" bytes from the open file into "buffer
 			int PrePos;
 			int NewPos;
+			char* buff;
 			int virtAddr = machine->ReadRegister(4);
 			int size = machine->ReadRegister(5);
 			int ID = machine->ReadRegister(6);
-			if (fileSystem->openf[id] == NULL ) 
+			if (fileSystem == NULL ) 
 			{
 				printf("\nNon-existence");
 				machine->WriteRegister(2, -1);
@@ -169,18 +172,63 @@ void ExceptionHandler(ExceptionType which)
 				return;
 			}
 			//Copy buffer from System memory space to User memory space
-			buff = User2System(virtAddr, charcount);
-			if (fileSystem->opend
-
-
-
-			int Read(char *buffer, int size, OpenFileId id);
+			buff = User2System(virtAddr, size);
+			delete buff;
+			break;
+		}
+		case SC_Write:// int Write(char *buffer, int size, OpenFileId id);
+		{
+			//Write "size" bytes from "buffer" to the open file
+			int PrePos;
+			int NewPos;
+			char* buff;
+			int virtAddr = machine->ReadRegister(4);
+			int size = machine->ReadRegister(5);
+			int ID = machine->ReadRegister(6);
+			if (fileSystem == NULL ) 
+			{
+				printf("\nNon-existence");
+				machine->WriteRegister(2, -1);
+				ProgramCounter();
+				return;
+			}
+			//Copy buffer from System memory space to User memory space
+			buff = User2System(virtAddr, size);
+			delete buff;
+			break;
+		}
+		case SC_ReadInt:
+		{	//https://gricad-gitlab.univ-grenoble-alpes.fr/systeme/nachos/tree/master
+			// read integer number from console
+			// DEBUG('a', "\n Read a integer from console.");
+			// printf("\n\n Read a integer from console.");
+			int number = 0;
+			int len = 0;
+			int sign = 0;
+			int i = 0;
+			char* buff = new char[MAX_INT_LENGTH];
+			len = gSynchConsole->Read(buff, MAX_INT_LENGTH);
+			sign = buff[0] == '-' ? 1:0;
+			for (i = sign; i < len; i++)
+			{
+				number = number * 10 + (int)(buff[i] & MASK_GET_NUM);
+			}
+			number = buff[0] == '-' ? -1*number : number;
+			machine->WriteRegister(2, number);
+			delete buff;
+			break;
+		}
+		case SC_PrintInt:
+		{
+			// print integer number from console
+			// DEBUG('a', "\n Print a integer to console.");
+			// printf("\n\n Print a integer to console.");
 			break;
 		}
 		default:
 			printf("\n Unexpected user mode exception (%d%d)", which, type);
 			break;
-			//interrupt->Halt();
+			interrupt->Halt();
 		}
 		ProgramCounter();
 	}
