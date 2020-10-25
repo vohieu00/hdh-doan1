@@ -116,6 +116,48 @@ void ExceptionHandler(ExceptionType which)
 	{
 	case NoException:
 		return;
+	case PageFaultException:
+		DEBUG('a', "\n No valid translation found");
+		printf("\n\n No valid translation found");
+		interrupt->Halt();
+		break;
+
+	case ReadOnlyException:
+		DEBUG('a', "\n Write attempted to page marked 'read-only'");
+		printf("\n\n Write attempted to page marked 'read-only'");
+		interrupt->Halt();
+		break;
+
+	case BusErrorException:
+		DEBUG('a', "\n Translation resulted invalid physical address");
+		printf("\n\n Translation resulted invalid physical address");
+		interrupt->Halt();
+		break;
+
+	case AddressErrorException:
+		DEBUG('a', "\n Unaligned reference or one that was beyond the end of the address space");
+		printf("\n\n Unaligned reference or one that was beyond the end of the address space");
+		interrupt->Halt();
+		break;
+
+	case OverflowException:
+		DEBUG('a', "\nInteger overflow in add or sub.");
+		printf("\n\n Integer overflow in add or sub.");
+		interrupt->Halt();
+		break;
+
+	case IllegalInstrException:
+		DEBUG('a', "\n Unimplemented or reserved instr.");
+		printf("\n\n Unimplemented or reserved instr.");
+		interrupt->Halt();
+		break;
+
+	case NumExceptionTypes: 
+		DEBUG('a', "\n Number exception types");
+		printf("\n\n Number exception types");
+		interrupt->Halt();
+		break;
+
 	case SyscallException:
 		switch (type) {
 		case SC_Halt:
@@ -123,17 +165,26 @@ void ExceptionHandler(ExceptionType which)
 			printf("\n\n Shutdown, initiated by user program.");
 			interrupt->Halt();
 			break;
-		case SC_Create:
+		case SC_CreateFile:
 		{
 			int virtAddr;
 			char* filename;
 
-			DEBUG('a', "\n SC Create call...");
+			DEBUG('a', "\n SC CreateFile call...");
 			DEBUG('a', "\n  Reading virtual address of filename");
 
 			virtAddr = machine->ReadRegister(4);
 			DEBUG('a', "\n Reading filename.");
 			filename = User2System(virtAddr, MaxFileLength + 1);
+
+			if (strlen(filename) == 0)
+			{
+				printf("\nFile name is wrong!!!");
+				machine->WriteRegister(2, -1); 
+				delete filename;
+				break;
+			}
+
 			if (filename == NULL)
 			{
 				printf("\n Not enough memory in system");
@@ -141,7 +192,6 @@ void ExceptionHandler(ExceptionType which)
 				machine->WriteRegister(2, -1);
 				delete filename;
 				return;
-				//break;
 			}
 			DEBUG('a', "\n Finish reading filename.");
 			if (!fileSystem->Create(filename, 0))
