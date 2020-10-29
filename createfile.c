@@ -4,9 +4,12 @@
 
 int main()
 {
-	int a = 5;
-	PrintStr("fffddfdd");
-	Halt();
+	int a;
+	char file[MaxFileLength];
+	PrintStr("Nhap ten file: ");
+	ReadStr(file, MaxFileLength);
+	a = Create(file);
+//	Halt();
 }
 
 

@@ -46,13 +46,52 @@
 //
 //	"which" is the kind of exception.  The list of possible exceptions 
 //	are in machine.h.
-//-----------------------------------------------------------------------
-//https://gricad-gitlab.univ-grenoble-alpes.fr/systeme/nachos/tree/master
-//https://github.com/dangkhoasdc/nachos/blob/master/userprog/exception.cc
-//-----------------------------------------------------------------------
-// Input - 
-//Output -
-//Purpose: Read data from file
+//----------------------------------------------------------------------
+char* User2System(int virtAddr,int limit) {
+	int i;// index
+	int oneChar;
+ 	char* kernelBuf = NULL;
+
+ 	kernelBuf = new char[limit +1];//need for terminal string
+ 	if (kernelBuf == NULL) {
+ 		return kernelBuf;
+	}
+
+ 	memset(kernelBuf,0,limit+1);
+
+ 	//printf("\n Filename u2s:");
+ 	for (i = 0 ; i < limit ;i++) {
+ 		machine->ReadMem(virtAddr+i,1,&oneChar);
+ 		kernelBuf[i] = (char)oneChar;
+ 		//printf("%c",kernelBuf[i]);
+ 		if (oneChar == 0) {
+ 			break;
+		}
+ 	}
+ 	return kernelBuf;
+} 
+
+int System2User(int virtAddr,int len,char* buffer) { 
+ 	if (len < 0) return -1;
+ 	if (len == 0)return len;
+ 	int i = 0;
+ 	int oneChar = 0 ;
+ 	do {
+ 		oneChar= (int) buffer[i];
+ 		machine->WriteMem(virtAddr+i,1,oneChar);
+ 		i++;
+ 	} while(i < len && oneChar != 0);
+ 	return i;
+}
+
+void advancePC() {
+   	int counter = machine->ReadRegister(PCReg);
+   	machine->WriteRegister(PrevPCReg, counter);
+    	counter = machine->ReadRegister(NextPCReg);
+    	machine->WriteRegister(PCReg, counter);
+   	machine->WriteRegister(NextPCReg, counter + 4);
+}
+
 
 void ProgramCounter()
 {
@@ -62,210 +101,181 @@ void ProgramCounter()
 	count = machine->ReadRegister(NextPCReg); 
 	machine->WriteRegister(PCReg, count);
 	machine->WriteRegister(NextPCReg, count + step);
+
 }
-
-// Input: - User space address (int)
-// - Limit of buffer (int)
-// Output:- Buffer (char*)
-// Purpose: Copy buffer from User memory space to System memory space
-
-
-char* User2System(int virtAddr, int limit)
+void
+ExceptionHandler(ExceptionType which)
 {
-	int i;// index
-	int oneChar;
-	char* kernelBuf = NULL;
-	kernelBuf = new char[limit + 1];//need for terminal string
-	if (kernelBuf == NULL)
-		return kernelBuf;
-	memset(kernelBuf, 0, limit + 1);
-	//printf("\n Filename u2s:");
-	for (i = 0; i < limit; i++)
+    int type = machine->ReadRegister(2);
+	switch (which) 
 	{
-		machine->ReadMem(virtAddr + i, 1, &oneChar);
-		kernelBuf[i] = (char)oneChar;
-		//printf("%c",kernelBuf[i]);
-		if (oneChar == 0)
-			break;
-	}
-	return kernelBuf;
-}
-
-// Input: - User space address (int)
-// - Limit of buffer (int)
-// - Buffer (char[])
-// Output:- Number of bytes copied (int)
-// Purpose: Copy buffer from System memory space to User memory space
-int System2User(int virtAddr, int len, char* buffer)
-{
-	if (len < 0) return -1;
-	if (len == 0)return len;
-	int i = 0;
-	int oneChar = 0;
-	do {
-		oneChar = (int)buffer[i];
-		machine->WriteMem(virtAddr + i, 1, oneChar);
-		i++;
-	} while (i < len && oneChar != 0);
-	return i;
-}
-
-void ExceptionHandler(ExceptionType which)
-{
-	int type = machine->ReadRegister(2);
-	switch (which)
-	{
-	case NoException:
-		return;
-	case PageFaultException:
-		DEBUG('a', "\n No valid translation found");
-		printf("\n\n No valid translation found");
-		interrupt->Halt();
-		break;
-
-	case ReadOnlyException:
-		DEBUG('a', "\n Write attempted to page marked 'read-only'");
-		printf("\n\n Write attempted to page marked 'read-only'");
-		interrupt->Halt();
-		break;
-
-	case BusErrorException:
-		DEBUG('a', "\n Translation resulted invalid physical address");
-		printf("\n\n Translation resulted invalid physical address");
-		interrupt->Halt();
-		break;
-
-	case AddressErrorException:
-		DEBUG('a', "\n Unaligned reference or one that was beyond the end of the address space");
-		printf("\n\n Unaligned reference or one that was beyond the end of the address space");
-		interrupt->Halt();
-		break;
-
-	case OverflowException:
-		DEBUG('a', "\nInteger overflow in add or sub.");
-		printf("\n\n Integer overflow in add or sub.");
-		interrupt->Halt();
-		break;
-
-	case IllegalInstrException:
-		DEBUG('a', "\n Unimplemented or reserved instr.");
-		printf("\n\n Unimplemented or reserved instr.");
-		interrupt->Halt();
-		break;
-
-	case NumExceptionTypes: 
-		DEBUG('a', "\n Number exception types");
-		printf("\n\n Number exception types");
-		interrupt->Halt();
-		break;
-
-	case SyscallException:
-		switch (type) {
-		case SC_Halt:
-			DEBUG('a', "\n Shut down, initiated by user program.");
-			printf("\n\n Shutdown, initiated by user program.");
-			interrupt->Halt();
+		case NoException:
 			return;
-		case SC_Create:
+		case PageFaultException:
+			printf("PageFaultException\n");
+			interrupt->Halt();
+			break;
+		case ReadOnlyException:
+			printf("ReadOnlyException\n");
+			interrupt->Halt();
+			break;
+		case BusErrorException:
+			printf("BusErrorException\n");
+			interrupt->Halt();
+			break;
+		case AddressErrorException:
+			printf("AddressErrorException\n");
+			interrupt->Halt();
+			break;
+		case OverflowException:
+			printf("OverflowException\n");
+			interrupt->Halt();
+			break;
+		case IllegalInstrException:
+			printf("IllegalInstrException\n");
+			interrupt->Halt();
+			break;
+		case NumExceptionTypes:
+			printf("NumExceptionTypes\n");
+			interrupt->Halt();
+			break;
+
+
+		case SyscallException:
+
+ 			switch (type) 
 		{
-			int virtAddr;
-			char* filename;
+			case SC_Halt: {
+ 				printf ("\nShutdown, initiated by user program.\n");
+ 				interrupt->Halt();
+ 				break;
+			}
+			case SC_Create: {
+				int virtAddr;
+				char* filename;
 
-			DEBUG('a', "\n SC CreateFile call...");
-			DEBUG('a', "\n  Reading virtual address of filename");
+				DEBUG('a', "\n SC CreateFile call...");
+				DEBUG('a', "\n  Reading virtual address of filename");
 
-			virtAddr = machine->ReadRegister(4);
-			DEBUG('a', "\n Reading filename.");
-			filename = User2System(virtAddr, MaxFileLength + 1);
+				virtAddr = machine->ReadRegister(4);
+				DEBUG('a', "\n Reading filename.");
+				filename = User2System(virtAddr, MaxFileLength + 1);
 
-			if (strlen(filename) == 0)
-			{
-				printf("\nFile name is wrong!!!");
-				machine->WriteRegister(2, -1); 
+				if (strlen(filename) == 0)
+				{
+					printf("\nFile name is wrong!!!");
+					machine->WriteRegister(2, -1); 
+					delete filename;
+					break;
+				}
+
+				if (filename == NULL)
+				{
+					printf("\n Not enough memory in system");
+					DEBUG('a', "\n Not enough memory in system");
+					machine->WriteRegister(2, -1);
+					delete filename;
+					return;
+				}
+				DEBUG('a', "\n Finish reading filename.");
+				if (!fileSystem->Create(filename, 0))
+				{
+					printf("\n Error care file '%s' ", filename);
+					machine->WriteRegister(2, -1);
+					delete filename;
+					return;
+				}
+				machine->WriteRegister(2, 0);
 				delete filename;
 				break;
 			}
+			case SC_Open: 
+			{
 
-			if (filename == NULL)
-			{
-				printf("\n Not enough memory in system");
-				DEBUG('a', "\n Not enough memory in system");
-				machine->WriteRegister(2, -1);
-				delete filename;
-				return;
-			}
-			DEBUG('a', "\n Finish reading filename.");
-			if (!fileSystem->Create(filename, 0))
-			{
-				printf("\n Error care file '%s' ", filename);
-				machine->WriteRegister(2, -1);
-				delete filename;
-				return;
-			}
-			machine->WriteRegister(2, 0);
-			delete filename;
-			break;
-		}
-		case SC_Open: 
-		{
-			printf("Calling SC_Open\n");
-			int virtAddr, mode;
-			char* filename;
+				printf("Calling SC_Open\n");
+				int virtAddr, mode, retVal;
+				char* filename;
 				
-			virtAddr = machine->ReadRegister(4);
-			filename = User2System(virtAddr,MaxFileLength+1);
+				virtAddr = machine->ReadRegister(4);
+				filename = User2System(virtAddr,MaxFileLength+1);
 				
-			mode = machine->ReadRegister(5);
-			printf("Mode = %d\n", mode);
-				
-			if(mode < 0 || mode > 1) {
-				printf("Khong ton tai mode tren\n");
-				machine->WriteRegister(2, -1);
-					
-			}
-				
-			else if(fileSystem->currentSize >= 10) {
-				printf("Khong the mo file vi bang mo ta file da het o nho\n");
-				machine->WriteRegister(2, -1);
-			}
-			else if(mode == 0 || mode == 1) {
-			
-				if(fileSystem->Open(filename, mode) == NULL) {
-					printf("File khong ton tai\n");
+				mode = machine->ReadRegister(5);
+				if(fileSystem->currentSize >= 10) {
+					printf("Khong the mo file vi bang mo ta file da het o nho\n");
 					machine->WriteRegister(2, -1);
+					break;
 				}
-				if(mode == 0) {
-					printf("Mo file %s thanh cong (mode = doc va ghi)\n", filename);
-					machine->WriteRegister(2, 0);
+
+
+				if(strcmp(filename, "stdin") == 0) {
+					if(mode == 2) {
+						printf("Mo thanh cong file stdin (Id = 0)\n");
+						machine->WriteRegister(2, 0);
+						break;
+					}
+					else {
+						printf("Mode khong dung cho stdin\n");
+						machine->WriteRegister(2, -1);
+						break;
+					}
+				}
+
+				else if(strcmp(filename, "stdout") == 0) {
+					if(mode == 3) {
+						printf("Mo thanh cong file stdout (Id = 1)\n");
+						machine->WriteRegister(2, 1);
+						break;
+					}
+					else {
+						printf("Mode khong dung cho stdout\n");
+						machine->WriteRegister(2, -1);
+						break;
+					}
+				}
+				else if(mode == 0 || mode == 1) {
+
+					if(fileSystem->Open(filename, mode) == NULL) {
+						printf("File khong ton tai\n");
+						machine->WriteRegister(2, -1);
+						break;
+					}
+
+					else if(mode == 0) {
+						printf("Mo file %s thanh cong (mode = doc va ghi)\n", filename);
+					}
+					else {
+						printf("Mo file %s thanh cong (mode = doc)\n", filename);
+					}
+					retVal = fileSystem->recentId;
+					printf("OpenFileID cua %s la : %d\n", filename, retVal);
+					printf("CurrentSize : %d\n", fileSystem->currentSize);
+					machine->WriteRegister(2, retVal);
+					break;
+				}
+				
+			}
+			case SC_Close: 
+			{
+				int openFileId;	
+				openFileId = machine->ReadRegister(4);
+				if(openFileId < 0 || openFileId > 9) {
+					printf("OpenFileId %d khong hop le\n", openFileId);
+					machine->WriteRegister(2, -1);
+					break;
 				}
 				else {
-					printf("Mo file %s thanh cong (mode = doc)\n", filename);
+					fileSystem->CloseFileId(openFileId);
+					printf("Close fileID : %d thanh cong\n", openFileId);
 					machine->WriteRegister(2, 0);
-				}
-				printf("OpenFileID cua %s la : %d\n", filename, (fileSystem->currentSize) -1);
-			}
-			break;
-			
-		}
-		case SC_Close: 	
-		{
-			int openFileId;	
-			openFileId = machine->ReadRegister(4);
-			if(openFileId < 2 || openFileId > 9 || openFileId >= fileSystem->currentSize) {
-				printf("OpenFileId %d khong hop le\n", openFileId);
-				machine->WriteRegister(2, -1);
-			}
-			else {
-				fileSystem->CloseFileId(openFileId);
-				printf("Close fileID : %d thanh cong\n", openFileId);
-				machine->WriteRegister(2, 0);
-			}	
+					break;
+				}	
 
-			ProgramCounter();
-			break;
-		}
-		case SC_Read: //int Read(char *buffer, int size, OpenFileId id);
-		{			
+			}
+			
+
+			case SC_Read: //int Read(char *buffer, int size, OpenFileId id);
+		{
+
 			//Read "size" bytes from the open file into "buffer
 			int PrePos;
 			int NewPos;
@@ -277,35 +287,35 @@ void ExceptionHandler(ExceptionType which)
 			{
 				printf("\n\n Out of mode table. Cannot read file.");
 				machine->WriteRegister(2, -1);
-				ProgramCounter();
-				return;
+				//ProgramCounter();
+				break;
 			}
 			if (fileSystem->fileIndex[ID] == NULL ) 
 			{
-				printf("\nNon-existence");
+				printf("\nNon-existence\n");
 				machine->WriteRegister(2, -1);
-				ProgramCounter();
-				return;
+				//ProgramCounter();
+				break;
 			}
 			if (fileSystem->fileIndex[ID]->type == 3) //file stdout
 			{
-				int len = gSynchConsole->Read(buff, size);
-				System2User(virtAddr, len, buff);
-				machine->WriteRegister(2, len);
-				ProgramCounter();
-				delete buff;
-				return;
+				//int len = gSynchConsole->Read(buff, size);
+				//System2User(virtAddr, len, buff);
+				printf("Cannot read file stdout.");
+				machine->WriteRegister(2, -1);
+				//ProgramCounter();
+				break;
 			}
 			//Copy buffer from System memory space to User memory space
 			buff = User2System(virtAddr, size);
-			if (fileSystem->fileIndex[ID]->type == 2)
+			if (fileSystem->fileIndex[ID]->type == 2) //file stdin
 			{
 				int len = gSynchConsole->Read(buff, size);
 				System2User(virtAddr, len, buff);
 				machine->WriteRegister(2, len);
 				delete buff;
-				ProgramCounter();
-				return;
+				//ProgramCounter();
+				break;
 			}
 			PrePos = fileSystem->fileIndex[ID]->GetCurrentPos();
 			if ((fileSystem->fileIndex[ID]->Read(buff, size))> 0)
@@ -313,139 +323,166 @@ void ExceptionHandler(ExceptionType which)
 				NewPos = fileSystem->fileIndex[ID]->GetCurrentPos();
 				System2User(virtAddr, NewPos- PrePos, buff);
 				machine->WriteRegister(2, NewPos - PrePos);
+				
 			}
 			else
-			{	printf("\n\n Empty file");
+			{	//printf("\n\n Empty file\n");
 				machine->WriteRegister(2, -2);
+				
 			}
 			delete buff;
-			ProgramCounter();
-			return;
+			break;
+			
 		}
-		case SC_Write:// int Write(char *buffer, int size, OpenFileId id);
-		{
-			//Write "size" bytes from "buffer" to the open file
-			int PrePos;
-			int NewPos;
-			char* buff;
-			int virtAddr = machine->ReadRegister(4);
-			int size = machine->ReadRegister(5);
-			int ID = machine->ReadRegister(6);
-			if (fileSystem->fileIndex[ID] == NULL ) 
+			case SC_Write:// int Write(char *buffer, int size, OpenFileId id);
 			{
-				printf("\nNon-existence");
-				machine->WriteRegister(2, -1);
-				ProgramCounter();
-				return;
-			}
-			//read-only file and stdin file
-			if (fileSystem->fileIndex[ID]->type == 1 || fileSystem->fileIndex[ID]->type == 2)
-			{
-				printf("\n Cannot not write this file.");
-				machine->WriteRegister(2, -1);
-				ProgramCounter();
-				return;	
-			}
-			buff = User2System(virtAddr, size);
-			PrePos = fileSystem->fileIndex[ID]->GetCurrentPos();
-			if (fileSystem->fileIndex[ID]->type == 0 && fileSystem->fileIndex[ID]->Write(buff, size) > 0)
-			{
-				NewPos = fileSystem->fileIndex[ID]->GetCurrentPos();
-				machine->WriteRegister(2, NewPos - PrePos);
-				ProgramCounter();
-				delete buff;
-				return;
-			}
-			if (fileSystem->fileIndex[ID]->type == 3)
-			{
-				int i;
-				for (i =0; i<strlen(buff); i++)
+				//Write "size" bytes from "buffer" to the open file
+				int PrePos;
+				int NewPos;
+				char* buff;
+				int virtAddr = machine->ReadRegister(4);
+				//printf("\n%d", virtAddr);
+				int size = machine->ReadRegister(5);
+				//printf("\n%d", size);
+				int ID = machine->ReadRegister(6);
+				//printf("\n%d\n", ID);
+				if (ID < 0 || ID > 10)
 				{
-					if (buff[i] != 0 && buff[i]!= '\n')
-					{
-						gSynchConsole->Write(buff + i, 1);
-					}
-					else
-					{
-						break;
-					}
+					printf("\n\n Out of mode table. Cannot write file.");
+					machine->WriteRegister(2, -1);
+					//ProgramCounter();
+					break;
 				}
-				buff[i] = '\n';
-				gSynchConsole->Write(buff+1, 1);
-				machine->WriteRegister(2, i-1);
-				ProgramCounter();
-				delete buff;
-				return;
-			}
-
-			//Copy buffer from System memory space to User memory space
+				if (fileSystem->fileIndex[ID] == NULL ) 
+				{
+					printf("\nNon-existence\n");
+					machine->WriteRegister(2, -1);
+					//ProgramCounter();
+					break;
+				}
+				//read-only file or stdin file (mode = 2)
+				if (fileSystem->fileIndex[ID]->type == 1 || fileSystem->fileIndex[ID]->type == 2)
+				{
+					printf("\n Cannot not write this file.");
+					machine->WriteRegister(2, -1);
+					//ProgramCounter();
+					break;	
+				}
+				buff = User2System(virtAddr, size);
+				PrePos = fileSystem->fileIndex[ID]->GetCurrentPos();
+				//read & write file
+				if (fileSystem->fileIndex[ID]->type == 0 
+						&& fileSystem->fileIndex[ID]->Write(buff, size) > 0) 
+				{
+					NewPos = fileSystem->fileIndex[ID]->GetCurrentPos();
+					//printf("%d	%d\n", NewPos, PrePos);
+					machine->WriteRegister(2, NewPos - PrePos);
+					//ProgramCounter();
+					delete buff;
+					break;
+				}
+				if (fileSystem->fileIndex[ID]->type == 3) //stdout file
+				{
+					int i;
+					for (i =0; i<strlen(buff); ++i)
+					{
+						if (buff[i] != 0 && buff[i]!= '\n')
+						{
+							gSynchConsole->Write(buff + i, 1);
+						}
+						else
+						{
+							break;
+						}
+					}
+					buff[i] = '\n';
+					gSynchConsole->Write(buff +i, 1);
+					machine->WriteRegister(2, i-1);
+					//ProgramCounter();
+					delete buff;
+					break;
+					
+				}
+				
 			
-		}
-		case SC_ReadInt:
-		{	
-			// read integer number from console
-			// DEBUG('a', "\n Read a integer from console.");
-			// printf("\n\n Read a integer from console.");
-			int number = 0;
-			int len = 0;
-			int sign = 0;
-			int i = 0;
-			char* buff = new char[MAX_INT_LENGTH];
-			len = gSynchConsole->Read(buff, MAX_INT_LENGTH);
-			sign = buff[0] == '-' ? 1:0;
-			for (i = sign; i < len; i++)
-			{
-				number = number * 10 + (int)(buff[i] & MASK_GET_NUM);
 			}
-			number = buff[0] == '-' ? -1*number : number;
-			machine->WriteRegister(2, number);
-			delete buff;
-			break;
-		}
-		case SC_PrintInt:
-		{
-			// print integer number from console
-			DEBUG('a', "\n Print a integer to console.");
-			printf("\n\n Print a integer to console.");
-			
-			break;
-		}
-		case SC_PrintStr:
-		{
-			int buffAddr = machine->ReadRegister(4);
-			int i = 0;
-			char* buff = new char[MaxLineLength];
-			buff = User2System(buffAddr, MaxLineLength);
-
-			while (buff[i] != 0 && buff[i] != '\n')
+			case SC_Seek:
 			{
+				int pos = machine->ReadRegister(4);
+				int fileID = machine->ReadRegister(5);
+				//printf("\n\n%d", fileID);
+				if(fileID < 0 || fileID > 9)
+				{
+					printf("\nID is out of range");
+					machine->WriteRegister(2, -1);
+					//ProgramCounter();
+					break;
+				}
+				if(fileSystem->fileIndex[fileID] == NULL) 
+				{
+					printf("\nFile does not exist");
+					machine->WriteRegister(2, -1);
+					//ProgramCounter();
+					break;
+				}
+				//printf("%d", fileID);
+				if(fileID == 0 || fileID == 1)
+				{
+					printf("\nCan not seek to file");
+					machine->WriteRegister(2, -1);			
+				}
+			
+				pos = (pos == -1) ? fileSystem->fileIndex[fileID]->Length() : pos;
+				if(pos > fileSystem->fileIndex[fileID]->Length() || pos < 0)
+				{
+					printf("\nCan not seek file to this position");
+					machine->WriteRegister(2, -1); 
+				}
+				else
+				{
+					fileSystem->fileIndex[fileID]->Seek(pos);
+					machine->WriteRegister(2, pos);
+				}
+				//ProgramCounter();
+				break;
+			}
+			
+			
+			case SC_PrintStr:
+			{
+				
+				int buffAddr = machine->ReadRegister(4);
+				int i = 0;
+				char* buff;
+				buff = User2System(buffAddr, MaxLineLength);
+
+				while (buff[i] != 0 && buff[i] != '\n')
+				{
+					gSynchConsole->Write(buff+i, 1);
+					i++;
+				}
+				
+		
+				buff[i]='\n';
 				gSynchConsole->Write(buff+i, 1);
-				i++;
+				delete[] buff;
+				break;			
+			}
+			case SC_ReadStr:
+			{
+				char* buff;
+				int virtAddr = machine->ReadRegister(4);
+				int len = machine->ReadRegister(5);
+				buff = User2System(virtAddr, len);
+				gSynchConsole->Read(buff, len);
+				System2User(virtAddr, len, buff);
+				delete[] buff;
+				//ProgramCounter();
+				break;
 			}
 
-			buff[i]='\n';
-			gSynchConsole->Write(buff+i, 1);
-			delete[] buff;
-			break;			
-		}
-		case SC_ReadStr:
-		{
-			char *buff = new char[MaxLineLength];
-			if (buff == NULL) break;
-			int bufAddrUser = machine->ReadRegister(4);
-			int len = machine->ReadRegister(5);
-			int size = gSynchConsole->Read(buff, len);
-			System2User(bufAddrUser, size, buff);
-			delete[] buff;
-			return;
-		}
-		default:
-			printf("\n Unexpected user mode exception (%d%d)", which, type);
-			break;
-			interrupt->Halt();
 		}
 		ProgramCounter();
-	}
+	}	
 }
-
 
